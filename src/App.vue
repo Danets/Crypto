@@ -213,22 +213,22 @@ export default {
       };
       this.list.push(tickerCurr);
 
-      setInterval(async () => {
-        let response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
-        );
-        let data = await response.json();
-        if (this.list.length) {
-          const updatedTicker = this.list.find(
-            (tick) => tick.name === tickerCurr.name
-          );
-          updatedTicker.price =
-            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        }
-        if (this.selectedTicker?.name === tickerCurr.name) {
-          this.graph.push(data.USD);
-        }
-      }, 5000);
+      // setInterval(async () => {
+      //   let response = await fetch(
+      //     `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
+      //   );
+      //   let data = await response.json();
+      //   if (this.list.length) {
+      //     const updatedTicker = this.list.find(
+      //       (tick) => tick.name === tickerCurr.name
+      //     );
+      //     updatedTicker.price =
+      //       data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+      //   }
+      //   if (this.selectedTicker?.name === tickerCurr.name) {
+      //     this.graph.push(data.USD);
+      //   }
+      // }, 5000);
       this.ticker = "";
     },
 
@@ -252,5 +252,3 @@ export default {
   },
 };
 </script>
-
-<style src="./app.css"></style>
