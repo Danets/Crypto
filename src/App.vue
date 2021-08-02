@@ -9,7 +9,8 @@
         <div class="mt-1 relative rounded-md shadow-md">
           <input
             v-model="ticker"
-            @keydown.enter="addTicker"
+            @keydown.enter="addTicker()"
+            @keydown.delete="existTicker = false"
             type="text"
             name="wallet"
             id="wallet"
@@ -26,8 +27,14 @@
             placeholder="For example DOGE"
           />
         </div>
-        <!-- <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap">
+        <div
+          v-if="ticker"
+          class="flex bg-white shadow-md p-1 rounded-md flex-wrap"
+        >
           <span
+            v-for="bage of bages"
+            :key="bage.Symbol"
+            @click="addTickerViaSymbol(bage.Symbol)"
             class="
               inline-flex
               items-center
@@ -41,10 +48,12 @@
               cursor-pointer
             "
           >
-            BTC
+            {{ bage.Symbol }}
           </span>
-        </div> -->
-        <!-- <div class="text-sm text-red-600">Такой тикер уже добавлен</div> -->
+        </div>
+        <div v-if="existTicker" class="text-sm text-red-600">
+          Such Bage was already added
+        </div>
       </div>
     </div>
     <button
@@ -201,35 +210,74 @@ export default {
       list: [],
       selectedTicker: null,
       graph: [],
+      bages: [],
+      existTicker: null,
     };
+  },
+
+  created() {
+    setInterval(async () => {
+      let response = await fetch(
+        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+      );
+      let res = await response.json();
+      const dataArr = Object.values(res.Data);
+      if (this.ticker) {
+        this.bages = dataArr
+          .filter((coin) => coin.Symbol.slice(2).includes(this.ticker))
+          .slice(0, 4);
+      }
+    }, 3000);
   },
 
   methods: {
     addTicker() {
-      if (this.ticker.trim() === "" && typeof this.ticker !== "number") return;
+      if (this.ticker.trim() === "") return;
       const tickerCurr = {
         name: this.ticker,
         price: "-",
       };
-      this.list.push(tickerCurr);
+      this.existTicker = this.list.find(
+        (ticker) => ticker.name === this.ticker
+      );
+      if (!this.existTicker) {
+        this.list.push(tickerCurr);
+        this.setPrice(tickerCurr);
+        this.ticker = "";
+      }
+    },
 
-      // setInterval(async () => {
-      //   let response = await fetch(
-      //     `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
-      //   );
-      //   let data = await response.json();
-      //   if (this.list.length) {
-      //     const updatedTicker = this.list.find(
-      //       (tick) => tick.name === tickerCurr.name
-      //     );
-      //     updatedTicker.price =
-      //       data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-      //   }
-      //   if (this.selectedTicker?.name === tickerCurr.name) {
-      //     this.graph.push(data.USD);
-      //   }
-      // }, 5000);
-      this.ticker = "";
+    addTickerViaSymbol(bage) {
+      if (this.ticker.trim() === "") return;
+      const tickerCurr = {
+        name: bage,
+        price: "-",
+      };
+      this.existTicker = this.list.find((ticker) => ticker.name === bage);
+      if (!this.existTicker) {
+        this.list.push(tickerCurr);
+        this.setPrice(tickerCurr);
+        this.ticker = "";
+      }
+    },
+
+    setPrice(tickerCurr) {
+      setInterval(async () => {
+        let response = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
+        );
+        let data = await response.json();
+        if (this.list.length) {
+          const updatedTicker = this.list.find(
+            (tick) => tick.name === tickerCurr.name
+          );
+          updatedTicker.price =
+            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+        }
+        if (this.selectedTicker?.name === tickerCurr.name) {
+          this.graph.push(data.USD);
+        }
+      }, 3000);
     },
 
     selectTicker(tick) {
