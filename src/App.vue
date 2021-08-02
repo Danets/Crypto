@@ -2,11 +2,10 @@
   <section>
     <div class="flex">
       <div class="max-w-xs">
-        <label
-          for="wallet"
-          class="block text-sm font-medium text-gray-700"
-        ></label>
-        <div class="mt-1 relative rounded-md shadow-md">
+        <label for="wallet" class="block text-sm font-medium text-gray-700"
+          >Input Ticker</label
+        >
+        <div class="mt-1 ml-1 relative rounded-md shadow-md">
           <input
             v-model="ticker"
             @keydown.enter="addTicker()"
@@ -216,6 +215,11 @@ export default {
   },
 
   created() {
+    const tickersData = localStorage.getItem("jsonTickers");
+    if (tickersData) {
+      this.list = JSON.parse(tickersData);
+      this.list.forEach((ticker) => this.setPrice(ticker));
+    }
     setInterval(async () => {
       let response = await fetch(
         `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
@@ -244,6 +248,7 @@ export default {
         this.list.push(tickerCurr);
         this.setPrice(tickerCurr);
         this.ticker = "";
+        localStorage.setItem("jsonTickers", JSON.stringify(this.list));
       }
     },
 
