@@ -95,11 +95,82 @@
     </button>
   </section>
 
-  <template v-if="list.length">
+  <template v-if="tickersList.length">
+    <button
+      class="
+        my-4
+        mx-2
+        inline-flex
+        items-center
+        py-2
+        px-4
+        border border-transparent
+        shadow-sm
+        text-sm
+        leading-4
+        font-medium
+        rounded-full
+        text-white
+        bg-gray-600
+        hover:bg-gray-700
+        transition-colors
+        duration-300
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
+      "
+      @click="page = page - 1"
+      v-if="page > 1"
+    >
+      Prev
+    </button>
+
+    <button
+      class="
+        my-4
+        mx-2
+        inline-flex
+        items-center
+        py-2
+        px-4
+        border border-transparent
+        shadow-sm
+        text-sm
+        leading-4
+        font-medium
+        rounded-full
+        text-white
+        bg-gray-600
+        hover:bg-gray-700
+        transition-colors
+        duration-300
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
+      "
+      @click="page = page + 1"
+      v-if="isExistPAge"
+    >
+      Next
+    </button>
+
+    <input
+      v-model="filter"
+      @keydown="search"
+      type="text"
+      name="filter"
+      class="
+        block
+        w-full
+        pr-10
+        border-gray-300
+        text-gray-900
+        focus:outline-none focus:ring-gray-500 focus:border-gray-500
+        sm:text-sm
+        rounded-md
+      "
+      placeholder="Look for tickers"
+    />
     <hr class="w-full border-t border-gray-600 my-4" />
     <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
       <div
-        v-for="tick of list"
+        v-for="tick of filteredTickers()"
         :key="tick.name"
         @click="selectTicker(tick)"
         :class="selectedTicker === tick ? 'border-4' : ''"
@@ -206,19 +277,32 @@ export default {
   data() {
     return {
       ticker: "",
-      list: [],
+      tickersList: [],
       selectedTicker: null,
       graph: [],
       bages: [],
+      filter: "",
+      page: 1,
+      isExistPAge: true,
       existTicker: null,
     };
   },
 
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+    console.log(windowData);
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
     const tickersData = localStorage.getItem("jsonTickers");
     if (tickersData) {
-      this.list = JSON.parse(tickersData);
-      this.list.forEach((ticker) => this.setPrice(ticker));
+      this.tickersList = JSON.parse(tickersData);
+      this.tickersList.forEach((ticker) => this.setPrice(ticker));
     }
     setInterval(async () => {
       let response = await fetch(
@@ -235,20 +319,27 @@ export default {
   },
 
   methods: {
+    filteredTickers() {
+      const start = (this.page - 1) * 6;
+      const end = this.page * 6;
+      const filteredTickers = this.tickersList.filter((ticker) =>
+        ticker.name.includes(this.filter)
+      );
+      this.isExistPAge = filteredTickers.length > end;
+      return filteredTickers.slice(start, end);
+    },
+
     addTicker() {
       if (this.ticker.trim() === "") return;
       const tickerCurr = {
         name: this.ticker,
         price: "-",
       };
-      this.existTicker = this.list.find(
+      this.existTicker = this.tickersList.find(
         (ticker) => ticker.name === this.ticker
       );
       if (!this.existTicker) {
-        this.list.push(tickerCurr);
-        this.setPrice(tickerCurr);
-        this.ticker = "";
-        localStorage.setItem("jsonTickers", JSON.stringify(this.list));
+        this.keepInStorage(tickerCurr);
       }
     },
 
@@ -258,11 +349,11 @@ export default {
         name: bage,
         price: "-",
       };
-      this.existTicker = this.list.find((ticker) => ticker.name === bage);
+      this.existTicker = this.tickersList.find(
+        (ticker) => ticker.name === bage
+      );
       if (!this.existTicker) {
-        this.list.push(tickerCurr);
-        this.setPrice(tickerCurr);
-        this.ticker = "";
+        this.keepInStorage(tickerCurr);
       }
     },
 
@@ -271,18 +362,28 @@ export default {
         let response = await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
         );
-        let data = await response.json();
-        if (this.list.length) {
-          const updatedTicker = this.list.find(
+        let receivedCrypto = await response.json();
+        if (this.tickersList.length) {
+          const updatedTicker = this.tickersList.find(
             (tick) => tick.name === tickerCurr.name
           );
           updatedTicker.price =
-            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+            receivedCrypto.USD > 1
+              ? receivedCrypto.USD.toFixed(2)
+              : receivedCrypto.USD.toPrecision(2);
         }
         if (this.selectedTicker?.name === tickerCurr.name) {
-          this.graph.push(data.USD);
+          this.graph.push(receivedCrypto.USD);
         }
       }, 3000);
+    },
+
+    keepInStorage(ticker) {
+      this.tickersList.push(ticker);
+      this.filter = "";
+      this.setPrice(ticker);
+      this.ticker = "";
+      localStorage.setItem("jsonTickers", JSON.stringify(this.tickersList));
     },
 
     selectTicker(tick) {
@@ -291,7 +392,7 @@ export default {
     },
 
     deleteTicker(tick) {
-      this.list = this.list.filter((ticker) => ticker !== tick);
+      this.tickersList = this.tickersList.filter((ticker) => ticker !== tick);
       this.selectedTicker = null;
     },
 
@@ -300,6 +401,24 @@ export default {
       const minValue = Math.min(...this.graph);
       return this.graph.map(
         (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+  },
+
+  watch: {
+    filter() {
+      this.page = 1;
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
       );
     },
   },
