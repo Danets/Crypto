@@ -170,7 +170,7 @@
     <hr class="w-full border-t border-gray-600 my-4" />
     <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
       <div
-        v-for="tick of filteredTickers()"
+        v-for="tick of paginatedTickers"
         :key="tick.name"
         @click="selectTicker(tick)"
         :class="selectedTicker === tick ? 'border-4' : ''"
@@ -234,7 +234,7 @@
     </h3>
     <div class="flex items-end border-gray-600 border-b border-l h-64">
       <div
-        v-for="(bar, idx) in normalizeGraph()"
+        v-for="(bar, idx) in normalizedGraph"
         :key="idx"
         :style="{ height: `${bar}%` }"
         class="bg-purple-800 border w-10 h-24"
@@ -271,6 +271,8 @@
 </template>
 
 <script>
+import { subsTicker, unsubsTicker } from "./api";
+
 export default {
   name: "App",
 
@@ -283,7 +285,6 @@ export default {
       bages: [],
       filter: "",
       page: 1,
-      isExistPAge: true,
       existTicker: null,
     };
   },
@@ -292,18 +293,31 @@ export default {
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
     );
-    console.log(windowData);
-    if (windowData.filter) {
-      this.filter = windowData.filter;
-    }
-    if (windowData.page) {
-      this.page = windowData.page;
-    }
+    // Object.assign(this, windowData);
+    const VALID_KEYS = ["filter", "keys"];
+    VALID_KEYS.forEach((key) => {
+      if (windowData[key]) {
+        this[key] = windowData[key];
+      }
+    });
+    // if (windowData.filter) {
+    //   this.filter = windowData.filter;
+    // }
+    // if (windowData.page) {
+    //   this.page = windowData.page;
+    // }
     const tickersData = localStorage.getItem("jsonTickers");
     if (tickersData) {
       this.tickersList = JSON.parse(tickersData);
-      this.tickersList.forEach((ticker) => this.setPrice(ticker));
+      this.tickersList.forEach((ticker) =>
+        subsTicker(ticker.name, (newPrice) => {
+          this.updateTicker(ticker.name, newPrice);
+        })
+      );
     }
+
+    // setInterval(this.updateTicker, 5000);
+    // GETTING COINS
     setInterval(async () => {
       let response = await fetch(
         `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
@@ -318,19 +332,51 @@ export default {
     }, 3000);
   },
 
-  methods: {
-    filteredTickers() {
-      const start = (this.page - 1) * 6;
-      const end = this.page * 6;
-      const filteredTickers = this.tickersList.filter((ticker) =>
-        ticker.name.includes(this.filter)
-      );
-      this.isExistPAge = filteredTickers.length > end;
-      return filteredTickers.slice(start, end);
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 6;
     },
 
+    endIndex() {
+      return this.page * 6;
+    },
+
+    isExistPage() {
+      return this.filteredTickers.length > this.endIndex;
+    },
+
+    filteredTickers() {
+      return this.tickersList.filter((ticker) =>
+        ticker.name.includes(this.filter)
+      );
+    },
+
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+      if (minValue === maxValue) {
+        return this.graph.map(() => 50);
+      }
+      return this.graph.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+
+    optionsOfPageState() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
+  },
+
+  methods: {
     addTicker() {
-      if (this.ticker.trim() === "") return;
+      if (this.ticker.trim() === "" && typeof this.ticker === "number") return;
       const tickerCurr = {
         name: this.ticker,
         price: "-",
@@ -357,68 +403,66 @@ export default {
       }
     },
 
-    setPrice(tickerCurr) {
-      setInterval(async () => {
-        let response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${tickerCurr.name}&tsyms=USD&api_key=aca3bfad1cd1066f8a7b1f4c4dd69a882765f14429ecf5c2c32968fcf811f223`
-        );
-        let receivedCrypto = await response.json();
-        if (this.tickersList.length) {
-          const updatedTicker = this.tickersList.find(
-            (tick) => tick.name === tickerCurr.name
-          );
-          updatedTicker.price =
-            receivedCrypto.USD > 1
-              ? receivedCrypto.USD.toFixed(2)
-              : receivedCrypto.USD.toPrecision(2);
-        }
-        if (this.selectedTicker?.name === tickerCurr.name) {
-          this.graph.push(receivedCrypto.USD);
-        }
-      }, 3000);
+    updateTicker(tickerName, price) {
+      this.tickersList
+        .filter((ticker) => ticker.name === tickerName)
+        .forEach((ticker) => {
+          if (ticker === this.selectTicker) {
+            this.graph.push(price);
+          }
+          ticker.price === price;
+        });
+    },
+
+    formatPrice(price) {
+      if (price === "-") {
+        return price;
+      }
+      return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
 
     keepInStorage(ticker) {
-      this.tickersList.push(ticker);
+      this.tickersList = [...this.tickersList, ticker];
       this.filter = "";
-      this.setPrice(ticker);
       this.ticker = "";
-      localStorage.setItem("jsonTickers", JSON.stringify(this.tickersList));
+      subsTicker(ticker.name, (newPrice) => {
+        this.updateTicker(ticker.name, newPrice);
+      });
     },
 
-    selectTicker(tick) {
-      this.selectedTicker = tick;
-      this.graph = [];
+    selectTicker(ticker) {
+      this.selectedTicker = ticker;
     },
 
     deleteTicker(tick) {
       this.tickersList = this.tickersList.filter((ticker) => ticker !== tick);
-      this.selectedTicker = null;
-    },
-
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
+      if (tick === this.selectedTicker) {
+        this.selectedTicker = null;
+      }
+      unsubsTicker(tick.name);
     },
   },
 
   watch: {
+    selectedTicker() {
+      this.graph = [];
+    },
+    tickersList() {
+      localStorage.setItem("jsonTickers", JSON.stringify(this.tickersList));
+    },
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 0) {
+        this.page -= 1;
+      }
+    },
     filter() {
       this.page = 1;
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
-      );
     },
-    page() {
+    optionsOfPageState(value) {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     },
   },
