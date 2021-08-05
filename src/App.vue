@@ -145,7 +145,7 @@
         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
       "
       @click="page = page + 1"
-      v-if="isExistPAge"
+      v-if="isExistPage"
     >
       Next
     </button>
@@ -319,16 +319,16 @@ export default {
     // setInterval(this.updateTicker, 5000);
     // GETTING COINS
     setInterval(async () => {
-      let response = await fetch(
-        `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
-      );
-      let res = await response.json();
-      const dataArr = Object.values(res.Data);
-      if (this.ticker) {
-        this.bages = dataArr
-          .filter((coin) => coin.Symbol.slice(2).includes(this.ticker))
-          .slice(0, 4);
-      }
+      // let response = await fetch(
+      //   `https://min-api.cryptocompare.com/data/all/coinlist?summary=true`
+      // );
+      // let res = await response.json();
+      // const dataArr = Object.values(res.Data);
+      // if (this.ticker) {
+      //   this.bages = dataArr
+      //     .filter((coin) => coin.Symbol.slice(2).includes(this.ticker))
+      //     .slice(0, 4);
+      // }
     }, 3000);
   },
 
@@ -376,7 +376,8 @@ export default {
 
   methods: {
     addTicker() {
-      if (this.ticker.trim() === "" && typeof this.ticker === "number") return;
+      const pattern = /^[a-zA-Z]+$/;
+      if (this.ticker.trim() === "" || !pattern.test(this.ticker)) return;
       const tickerCurr = {
         name: this.ticker,
         price: "-",
@@ -390,7 +391,6 @@ export default {
     },
 
     addTickerViaSymbol(bage) {
-      if (this.ticker.trim() === "") return;
       const tickerCurr = {
         name: bage,
         price: "-",
