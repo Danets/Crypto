@@ -232,12 +232,16 @@
     <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
       {{ selectedTicker.name }} - USD
     </h3>
-    <div class="flex items-end border-gray-600 border-b border-l h-64">
+    <div
+      class="flex items-end border-gray-600 border-b border-l h-64"
+      ref="graph"
+    >
       <div
         v-for="(bar, idx) in normalizedGraph"
         :key="idx"
         :style="{ height: `${bar}%` }"
         class="bg-purple-800 border w-10 h-24"
+        ref="graphColumn"
       ></div>
     </div>
     <button
@@ -283,9 +287,11 @@ export default {
       selectedTicker: null,
       graph: [],
       bages: [],
+      maxGraphElements: 1,
       filter: "",
       page: 1,
       existTicker: null,
+      widthGraphCol: null,
     };
   },
 
@@ -374,6 +380,14 @@ export default {
     },
   },
 
+  mounted() {
+    window.addEventListener("resize", this.calcMaxLength);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener("resize", this.calcMaxLength);
+  },
+
   methods: {
     addTicker() {
       const pattern = /^[a-zA-Z]+$/;
@@ -407,11 +421,25 @@ export default {
       this.tickersList
         .filter((ticker) => ticker.name === tickerName)
         .forEach((ticker) => {
-          if (ticker === this.selectTicker) {
+          if (ticker === this.selectedTicker) {
             this.graph.push(price);
+            this.calcMaxLength();
+            while (this.graph.length > this.maxGraphElements) {
+              this.graph.shift();
+            }
           }
           ticker.price === price;
         });
+    },
+
+    calcMaxLength() {
+      if (!this.$refs.graph) {
+        return;
+      }
+      if (this.$refs.graphColumn) {
+        this.maxGraphElements =
+          this.$refs.graph.clientWidth / this.$refs.graphColumn.clientWidth;
+      }
     },
 
     formatPrice(price) {
@@ -446,6 +474,7 @@ export default {
   watch: {
     selectedTicker() {
       this.graph = [];
+      this.$nextTick().then(this.calcMaxLength);
     },
     tickersList() {
       localStorage.setItem("jsonTickers", JSON.stringify(this.tickersList));
